@@ -89,17 +89,20 @@ public class Mailx {
   		}
 
     	// Connect and get the page, backout if we can't.
-        System.out.println("Simulated browser getting page " + pageUrl);
+        System.out.println("HtmlUnit browser getting page " + pageUrl);
 		HtmlPage page;	// This will be the page we will be working on, as represented by htmlUnit
 		try { page = webClient.getPage(pageUrl); }
 		catch (Exception e) {
-        	System.err.println("Could not get page " + uri);
-        	e.printStackTrace();
-				return;
+			// Mark we have been here before even if we got an error!
+			urlsVisited.add(pageUrl); 
+        	if (verbose) { 
+				System.err.println("Could not get page " + pageUrl + " " + e.toString());
+        		e.printStackTrace(); }
+			return;
 		} 
 
 		// Mark we have been here before
-   		urlsVisited.add(page.getUrl().toString()); 
+   		urlsVisited.add(pageUrl); // Use htmlUnit's name of the page, or our name? A question that remains...
 
   		// The page is open and loaded, now we can search...
    		searchNodes(page, pageUrl, "//text()[contains(.,\"@\")]"); // all DOM text nodes &
@@ -110,12 +113,11 @@ public class Mailx {
 
 		// Here we click and crawl recursively on all dynamic links
 		visitDynamicLinks (page, pageUrl); 
-    
-       	// Now we recurse on the static content that we accumulated
-	
 
-	} // end crawl
+		// Now crawl recursively on all static links
+		visitStaticLinks (page, pageUrl);
 
+    } // End crawl
 
 
 	public static void crawl(HtmlPage page) {
@@ -129,7 +131,7 @@ public class Mailx {
 	    	try { webClient.getWebWindows().get(0).getHistory().back(); }
 	    	catch (Exception e) {
        			System.err.println("Back button after dynamic link invocation failed.");
- 	            e.printStackTrace(); 		
+ 	            if (verbose) { e.printStackTrace(); }		
 	    	}
 		    return;
 		}
@@ -142,17 +144,18 @@ public class Mailx {
 		searchNodes(page, pageUrl, "//comment()[contains(.,\"@\")]"); // all html comments
 
 		// Now get all static links to crawl along these, accumulate then in urlsReachable
-		// getStaticLinks (page, pageUrl);
+		getStaticLinks (page, pageUrl);
 
 		// Here we click and crawl recursively on all dynamic links
-		// visitDynamicLinks (page, pageUrl); 
+		visitDynamicLinks (page, pageUrl); 
     
-       	// Now we recurse on the static content that we accumulated
-	}	
+		// Now crawl recursively on all static links
+		visitStaticLinks (page, pageUrl);
+
+	} // End crawl
 
 
-
-   	private static void searchNodes (HtmlPage page, String pageUrl, String xPath) {
+	private static void searchNodes (HtmlPage page, String pageUrl, String xPath) {
 
        	Set<String> eMails = new HashSet<String>();
         final List<?> possibles = page.getByXPath(xPath);
@@ -231,12 +234,12 @@ public class Mailx {
 
        	// Now here we click on the dynamic content, return via "Back" and keep collecting static content
         clickables.forEach((i) -> {
-       		printlnV("----- Traversing the dynamic link " + i.toString());
+       		System.out.println("HtmlUnit browser getting page via simulated click of " + i.toString());
        		HtmlPage newPage;
        		try { newPage = ((DomElement) i).click(); }
        		catch (Exception e) {
        			System.err.println("Click action on " + i.toString() + " failed. Skipping it");
- 	            e.printStackTrace();
+ 	            if (verbose) { e.printStackTrace(); }
 				return;
        		}
        		crawl (newPage);
@@ -245,6 +248,24 @@ public class Mailx {
 
     }
 
+
+    private static void visitStaticLinks (HtmlPage page, String pageUrl) {
+       	// Now we recurse on the static content that we accumulated
+        try {
+        	urlsReachable.forEach((i) -> {
+        		printlnV("---- traversing static link: " + i);
+ 				if (urlsVisited.contains(i) == false) {
+ 					// We visit a URL we have not visited
+ 	 	      		printlnV("---- will crawl " + i);
+ 					crawl(i);
+ 				}
+        	});
+        } catch (Exception e) {
+      		System.err.println("Cannot iterate further! HtmlUnit problems!");
+ 	        if (verbose) { e.printStackTrace(); }
+ 	        return;		
+        }
+    } // End Visit Static Links
 
     private static void setWebClient() {
     	// Turn the logger for htmlUnit off, otherwise we will be swamped indeed
@@ -328,9 +349,6 @@ public class Mailx {
     	// Print out only if verbose!
     	if (verbose == true) { System.out.println(str); }
     } // end printlnV
-
-
-
 
 
 } // end class MailX
