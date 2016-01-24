@@ -53,10 +53,10 @@ public class Mailx {
     static final String MARGIN = "        ";
 
     /**
-    * Entry point for MailX, a simple scrapping sample program for email extraction.
+    * Entry point for Mailx, a simple scrapping sample program for email extraction.
     *
-    * <p> @param arguments contains the commands passed as part of the invocation of the
-    * class <code> Mailx </code> and can have the following form: </p>
+    * arguments contains the commands line.
+    * Can have the following form:
     *
     * <p> ...Mailx <an uri to crawl from> [-v|-t], i.e. ...Mailx http://mysite.com -v </p>
     * <p> The Optional argument -v can be provided for verbose output, -t for trace/debug output </p>
@@ -79,11 +79,9 @@ public class Mailx {
 
    
     /**
-    * Crawl from url or uri @param pageUrl, limiting to only links sharing the same uri
-    * (that is, do not crawl on subdomains). <code>Crawl(String pageUrl)</code> is called 
-    * with @param pageUrl of class String for pages that are expressed via a static URL. 
-    * When a page is visited as a result of a simulated dynamic action, such as a click, 
-    * the <code>Crawl(HtmlPage)</code> method is invoked.
+    * Crawl but limit ourselves to only links that we have not visited before
+    * <code>Crawl(String pageUrl)</code> is called 
+    * for pages for which we have a static URL. 
     */
     private static void crawl(String pageUrl) {
 
@@ -114,8 +112,8 @@ public class Mailx {
 
     /**
     * <p> Crawl from the current page dynamically reached by simulating a click. The current
-    * page is passed in @param page. Notice that <code>Crawl(String pageUrl)</code> is called 
-    * a String parameter for pages that are expressed via a static URL.<p/>
+    * page is passed in parameter page. Notice that <code>Crawl(String pageUrl)</code> is 
+    * instead called with a String parameter for pages that are expressed via a static URL.</p>
     *
     * Because the URL of a page resulting from a script/route cannot be anticipated until
     * the browser is called, this page might not be inside this website. If this is the case
@@ -160,9 +158,9 @@ public class Mailx {
     } // End crawl
 
     /**
-    * <p>traverse checks if the current page, represented by @param page with @param pageUrl URL,
-    * has been visited before (by checking against the contents of the <code>urlsVisited</code> 
-    * set). If the page has not been visited, traverse looks for text and comment nodes that might
+    * <p>traverse checks if the current page has been visited before (by checking against 
+    * the contents of the <code>urlsVisited</code> set). If the page has not been visited,
+    * traverse looks for text and comment nodes that might
     * contain email strings by calling <code>searchNodes<code> on all HTML nodes containing 
     * text, comments included.</p>
     * 
@@ -192,8 +190,7 @@ public class Mailx {
     }
 
     /**
-    * searchNodes visits the current @param page with @param pageUrl URL, for 
-    * DOM nodes specified by the XPATH @param xPath expression, and then looks 
+    * searchNodes visits the current page for DOM nodes, and then looks 
     * looking for strings that might be emails in each of these nodes.mic routes
     */
     private static void searchNodes (HtmlPage page, String pageUrl, String xPath) {
@@ -225,8 +222,8 @@ public class Mailx {
     } // End searchNodes
 
     /**
-    * getStaticLinks visits the anchors and hyperlink expressions of the current @param page 
-    * with @param pageUrl URL, and addes them to the class global set <code> urlsReachable </code>
+    * getStaticLinks visits the anchors and hyperlink expressions of the current page 
+    * and adds them to the set <code> urlsReachable </code>
     */
     private static void getStaticLinks (HtmlPage page, String pageUrl) {
 
@@ -273,9 +270,9 @@ public class Mailx {
     } // getStaticLinks
 
     /**
-    * visitDynamicLinks finds clickable items in the current specified by @param page 
-    * with @param pageUrl URL, and executes a simulated HtmlUnit click action. It then
-    * passes this new current page to  <code> crawl(HtmlPage page)</code>
+    * visitDynamicLinks finds clickable items in the current page 
+    * and executes a simulated HtmlUnit click action on them. It then
+    * passes the new current page to  <code> crawl(HtmlPage page)</code>
     */
     private static void visitDynamicLinks (HtmlPage page, String pageUrl) {
 
@@ -306,11 +303,8 @@ public class Mailx {
     } // End visitDynamicLinks
 
     /**
-    * visitStaticLinks visits static links we have accumulated after examining
-    * the current page (matching @param page, with URL @paramUrl). The parameters
-    * are used only for printing to the console if executing under the verbose
-    * or trace modes. The URLs listed in the set <code>urlsReachable</code> that
-    * are not present in the <code>urlsVisited</code> are visited methodically instead.
+    * visitStaticLinks visits all static links we have accumulated after examining
+    * the current page 
     */
     private static void visitStaticLinks (HtmlPage page, String pageUrl) {
         // Now we recurse on the static content that we accumulated
@@ -336,8 +330,7 @@ public class Mailx {
 
     /**
     * setWebClient sets up the HtmlUnit web client (i.e. the simulated browser) with
-    * many settings that have proven correct in the field. Obtained via searches on
-    * StackOverflow.
+    * many settings that have proven correct in the field. 
     */
     private static void setWebClient() {
         // Turn the logger for htmlUnit off, otherwise we will be swamped indeed
@@ -373,13 +366,12 @@ public class Mailx {
     } // end setWebClient
 
    /**
-    * processArgs processes the command line contained in @param arguments
-    * Arguments can have the following form: </p>
+    * processArgs processes the command line.
+    * The command line can have the following form: </p>
     *
     * <p> ...Mailx <an uri to crawl from> [-v|-t], i.e. ...Mailx http://mysite.com -v </p>
     * <p> The Optional argument -v can be provided for verbose output, 
-    * -t for trace/debug output where all of the URLs of all pages visited are written to the screen,
-    * with the exception of HtmlUnit logging, which is extremely verbose</p>
+    *  Use -t for trace/debug output</p>
     */
     private static void processArgs(String[] arguments) {
 
@@ -422,8 +414,9 @@ public class Mailx {
     } // end processArgs
 
 
-    // Some minor utility functions
-
+    /**
+    * Check if a given pattern exists in a string.
+    */
     private static boolean containsPattern(String string, String regex) {
         Pattern pattern = Pattern.compile(regex);
 
@@ -432,11 +425,18 @@ public class Mailx {
         return matcher.find();
     } // end containsPattern
 
+   /**
+    * Print to the console if verbose mode is on (-v at the command line).
+    * Also prints when trace mode is on.
+    */
     private static void printlnV(String str) {
         // Print out if verbose or trace mode are on
         if (verbose == true || trace == true) { System.out.println(str); }
     } // end printlnT
 
+   /**
+    * Print to the console if trace mode is on (-t at the command line)
+    */
     private static void printlnT(String str) {
         // Print out only if trace mode is on
         if (trace == true) { System.out.println(str); }
