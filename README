@@ -97,3 +97,6 @@ Javascript completion.
 
 Currently, Mailx is not case sensitive, which might result in some omissions if some websites include
 resources identically named but with different case.
+
+Many more route behavior and dynamic links, using attributes for events handled by RoR, ASP, etc.
+can be added. Currently these are not handled.
