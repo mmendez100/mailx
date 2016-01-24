@@ -10,11 +10,10 @@ party websites are not crawled. Mailx uses the 'headless' browser HtmlUnit to ac
 
 ## Installation
 
-To install and run, it is recommended to create a new directory, and make it the current directory.
-Then clone the contents of this Mailx repo into that directory. The cloning will result in the
+To install and run, clone the contents of Mailx. The cloning will result in the
 following structure
 
-	.
+	mailx
 	|--- classes
 	|    |--- zedbit
 	|    |    --- mailx
@@ -32,21 +31,15 @@ following structure
 	|--- README (this file) 
 
 
-## Building Mailx
+## Building and Executing Mailx
 
-To build it, execute at the current directory signified by '.' the following at the command line:
+To build it, make the top mailx directory the current directory and
+execute the following at the command line:
 
 	javac -cp "classes:lib/*" -d classes src/zedbit/mailx/*.java
 
-The javadoc can be generated as follows, with -private required for output for private members:
-
-	javadoc -private -d html -cp "classes:lib/*" -sourcepath src zedbit.mailx
-
-
-## Usage for Mailx
-
-After building as specified above, to run it, at the same directory, execute the following 
-command line:
+After building as specified above, to run, at the same top level directory mailx
+execute the following command line:
 
  	for silent mode:
 		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> 
@@ -56,6 +49,10 @@ command line:
 
 	for debug or trace mode:
 		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> -t
+
+The javadoc can be generated as follows, with -private used for meaningful output:
+
+	javadoc -private -d html -cp "classes:lib/*" -sourcepath src zedbit.mailx
 
 
 ## Architecture and Comments
@@ -100,3 +97,8 @@ resources identically named but with different case.
 
 Many more route behavior and dynamic links, using attributes for events handled by RoR, ASP, etc.
 can be added. Currently these are not handled.
+
+
+## Testing
+
+Mailx has been tested with java 1.8.0_66, on MacOS Yosemite 10.10.5 and with 
