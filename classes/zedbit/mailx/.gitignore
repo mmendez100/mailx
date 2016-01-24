@@ -1,0 +1,7 @@
+#
+# in this class directory, ignore the classes, thus preserving
+# the class directory structure, and not keeping the classes
+# 
+#
+*.class
+!.gitignore
