@@ -42,6 +42,7 @@ public class Mailx {
     //We will follow two kinds of links, relative which we can build a regex for now, and absolute...
     static final Pattern relHrefP = Pattern.compile("(^.*)(href=\")(/[^\"]+)(.*$)");
     static Pattern absHrefP; // compiled at method processArgs once we have extracted our uri
+    static Pattern websiteP; // as above, used to check dynamic links/routes to be within this website
 
     // Some constants for some pretty-printing 
     static final String ANSI_RED = "\u001B[31m";
@@ -87,7 +88,7 @@ public class Mailx {
         }
 
         // Connect and get the page, backout if we can't.
-        System.out.println("HtmlUnit browser getting page " + pageUrl);
+        System.out.println("Crawling Static Link w/URL=" + pageUrl);
         HtmlPage page;	// This will be the page we will be working on, as represented by htmlUnit
         try { page = webClient.getPage(pageUrl); }
         catch (Exception e) {
@@ -99,21 +100,8 @@ public class Mailx {
             return;
         }
 
-        // Mark we have been here before
-        urlsVisited.add(pageUrl); // Use htmlUnit's name of the page, or our name? A question that remains...
-
-        // The page is open and loaded, now we can search...
-        searchNodes(page, pageUrl, "//text()[contains(.,\"@\")]"); // all DOM text nodes &
-        searchNodes(page, pageUrl, "//comment()[contains(.,\"@\")]"); // all html comments
-
-        // Now get all static links to crawl along these, accumulate then in urlsReachable
-        getStaticLinks (page, pageUrl);
-
-        // Here we click and crawl recursively on all dynamic links
-        visitDynamicLinks (page, pageUrl);
-
-        // Now crawl recursively on all static links
-        visitStaticLinks (page, pageUrl);
+        // Now do the actual crawling by traversing from the HtmlPage page loaded
+        traverse (page, pageUrl);
 
     } // End crawl
 
@@ -121,11 +109,12 @@ public class Mailx {
     public static void crawl(HtmlPage page) {
 
         final String pageUrl = page.getUrl().toString();
-        printlnV("Crawling HtmlPage instace with URL=" + pageUrl);
+        System.out.println("Crawling Dynamic Link w/URL=" + pageUrl);
 
-        // Now check if we have been at this URL before, we back out
+        // Now check if we have been at this URL before, OR if this dynamic
+        // link is actually not in this website, if so we back out
         if (urlsVisited.contains(pageUrl) == true) {
-            printlnV("We have already visited " + pageUrl + ". Skipping it");
+            System.out.println(MARGIN + pageUrl + " already crawled. Back buttoning it");
             try { webClient.getWebWindows().get(0).getHistory().back(); }
             catch (Exception e) {
                 System.err.println("Back button after dynamic link invocation failed.");
@@ -134,7 +123,29 @@ public class Mailx {
             return;
         }
 
-        // Mark we have been here before!
+        // As this crawl(HtmlPage page) method gets called dynamically, it is possible that
+        // the website's dynamic code has redirected us out to a different website, so we 
+        // need to check and if so backout
+        Matcher m = websiteP.matcher(pageUrl); 
+        if (m.matches() == false) { 
+            System.out.println(MARGIN + pageUrl + " dynamic link/route sent us outside this website. Back buttoning it");
+            try { webClient.getWebWindows().get(0).getHistory().back(); }
+            catch (Exception e) {
+                System.err.println("Back button after dynamic link invocation failed.");
+                if (verbose) { e.printStackTrace(); }
+            }
+            return;
+        }
+
+       // Now do the actual crawling by traversing from the HtmlPage page loaded
+        traverse (page, pageUrl);
+
+    } // End crawl
+
+
+    private static void traverse (HtmlPage page, String pageUrl) {
+
+        // Mark we have been here!
         urlsVisited.add(pageUrl);
 
         // The page is open and loaded, now we can search...
@@ -150,7 +161,7 @@ public class Mailx {
         // Now crawl recursively on all static links
         visitStaticLinks (page, pageUrl);
 
-    } // End crawl
+    }
 
 
     private static void searchNodes (HtmlPage page, String pageUrl, String xPath) {
@@ -232,7 +243,7 @@ public class Mailx {
 
         // Now here we click on the dynamic content, return via "Back" and keep collecting static content
         clickables.forEach((i) -> {
-            System.out.println("HtmlUnit browser getting page via simulated click of " + i.toString());
+            printlnV("HtmlUnit browser getting page via simulated click of " + i.toString());
             HtmlPage newPage;
             try { newPage = ((DomElement) i).click(); }
             catch (Exception e) {
@@ -243,8 +254,7 @@ public class Mailx {
             crawl (newPage);
     
         });
-
-    }
+    } // End visitDynamicLinks
 
 
     private static void visitStaticLinks (HtmlPage page, String pageUrl) {
@@ -263,7 +273,7 @@ public class Mailx {
             if (verbose) { e.printStackTrace(); }
             return;
         }
-    } // End Visit Static Links
+    } // end Visit Static Links
 
     private static void setWebClient() {
         // Turn the logger for htmlUnit off, otherwise we will be swamped indeed
@@ -330,6 +340,7 @@ public class Mailx {
             System.out.println("Starting Page: " + startPage);
             System.out.println("URI: " + uri);
             absHrefP = Pattern.compile("(^.*)(href=\")(" + uri +"[^\"]+)(.*$)");
+            websiteP = Pattern.compile("(^" + uri +")(.*$)");
         }
     } // end processArgs
 
