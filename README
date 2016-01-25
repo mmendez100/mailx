@@ -33,10 +33,12 @@ following structure
 
 ## Building and Executing Mailx
 
-To build it, make the top mailx directory the current directory and
+To build it, make the top mailx directory the current directory by cd'ing into it and
 execute the following at the command line:
 
 	javac -cp "classes:lib/*" -d classes src/zedbit/mailx/*.java
+
+Note: Mailx requires Java 8 or higher at the command line, (i.e. 1.8.x returned from the command 'java -version' which usually requires installing the JDK, not only the JRE. Java 7 will not work.
 
 After building as specified above, to run, at the same top level directory mailx
 execute the following command line:
