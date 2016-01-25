@@ -38,18 +38,24 @@ execute the following at the command line:
 
 	javac -cp "classes:lib/*" -d classes src/zedbit/mailx/*.java
 
-Note: Mailx requires Java 8 or higher at the command line, (i.e. 1.8.x returned from the command 'java -version' which usually requires installing the JDK, not only the JRE. Java 7 will not work.
+Note: Mailx requires Java 8 or higher at the command line, (i.e. 1.8.x returned from the command 
+'java -version'). This usually requires installing the JDK, not only the JRE. Mailx will not
+compile under Java 7.
 
 After building as specified above, to run, at the same top level directory mailx
 execute the following command line:
 
  	for silent mode:
+
 		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> 
 
-	for a slightly more verbose mode:
+	As HtmlUnit waits for JavaScript completion for each website visited, the
+	slightly more verbose -v mode provides more input to the user as Mailx runs:
+
 		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> -v
 
-	for debug or trace mode:
+	for debug or trace mode, use -t
+
 		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> -t
 
 The javadoc can be generated as follows, with -private used for meaningful output:
@@ -88,19 +94,23 @@ Currently, the code is unable to switch HtmlUnit's page time to 100% XML pages, 
 or php returning XML. When this happens, searching and inserting XML nodes, versus HTML Nodes,
 results in (caught) errors.
 
-In addition, efficiency can be increased by not checking files that might not contain emails if properly
-named, such as JPGs or PNGs. Right now a list and set of each page's static links is created, for
-debugging advantages, but these pages could be directly fed into the urlsReachable set, though any
-advantages in speed are not significant to the delays imposed by HtmlUnit waiting for background
-Javascript completion. 
+In addition, efficiency can be increased by not checking files that might not contain emails if
+properly named, such as JPGs or PNGs. Right now a list and set of each page's static links is
+created, for debugging advantages, but these pages could be directly fed into the urlsReachable
+set, though any benefits in speed are not significant to the delays imposed by HtmlUnit waiting
+for background Javascript completion. 
 
-Currently, Mailx is not case sensitive, which might result in some omissions if some websites include
-resources identically named but with different case.
+Currently, Mailx is not case sensitive, which might result in some omissions if some websites 
+include resources identically named but with different case.
 
 Many more route behavior and dynamic links, using attributes for events handled by RoR, ASP, etc.
-can be added. Currently these are not handled.
+can be added. Currently these are not handled. Moreover, in some cases event waiting 100 mS after
+each page visited is insufficient for dynamic route invocations. This can result in some
+dynamic links not being visited at some times, but increasing this to 1 second results in
+slow execution even for moderately-sized sites.
 
 
 ## Testing
 
-Mailx has been tested with java 1.8.0_66, on MacOS Yosemite 10.10.5 and with 
+Mailx has been tested with java 1.8.0_66, on MacOS "Yosemite" v. 10.10.5 and with 
+java 1.8.0_72, and on MacOS "El Capitan," v. 10.11.2.
