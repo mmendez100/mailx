@@ -1,0 +1,9 @@
+#
+# In this class directory, ignore the classes, thus preserving
+# the class directory structure, and not keeping the classes
+# 
+# http://stackoverflow.com/questions/14541253/commit-empty-folder-structure-with-git
+# 
+#
+*.class
+!.gitignore

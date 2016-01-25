@@ -1,0 +1,116 @@
+# Mailx
+
+Mailx is a sample, one-class website crawler written in Java that looks for emails,
+searching both static links (i.e. anchors, href=, and other resources present statically
+in reachable webpages) and dynamic links, i.e. new html resources or pages that are
+presented when JavaScript runs in the page, for example ng-click events from Angular.js.
+
+Mailx limits itself to webpages that belong to the same website, i.e. subdomains or third
+party websites are not crawled. Mailx uses the 'headless' browser HtmlUnit to accomplish this.
+
+## Installation
+
+To install and run, clone the contents of Mailx. The cloning will result in the
+following structure
+
+	mailx
+	|--- classes
+	|    |--- zedbit
+	|    |    --- mailx
+	|	 |        ---.gitignore (present here to have git store the classes path)
+	|
+	|--- lib
+	|    |--- [all jars required for HtmlUnit v.2.19 to run]
+	|
+	|--- src
+	|	 |---
+	|    |--- zedbit
+	|    |    --- mailx
+	|	 |        ---Mailx.java (the source for Mailx)
+	|
+	|--- README (this file) 
+
+
+## Building and Executing Mailx
+
+To build it, make the top mailx directory the current directory by cd'ing into it and
+execute the following at the command line:
+
+	javac -cp "classes:lib/*" -d classes src/zedbit/mailx/*.java
+
+Note: Mailx requires Java 8 or higher at the command line, (i.e. 1.8.x returned from the command 
+'java -version'). This usually requires installing the JDK, not only the JRE. Mailx will not
+compile under Java 7.
+
+After building as specified above, to run, at the same top level directory mailx
+execute the following command line:
+
+ 	for silent mode:
+
+		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> 
+
+	As HtmlUnit waits for JavaScript completion for each website visited, the
+	slightly more verbose -v mode provides more input to the user as Mailx runs:
+
+		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> -v
+
+	for debug or trace mode, use -t
+
+		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> -t
+
+The javadoc can be generated as follows, with -private used for meaningful output:
+
+	javadoc -private -d html -cp "classes:lib/*" -sourcepath src zedbit.mailx
+
+
+## Architecture and Comments
+
+Mailx is a sample Java program that uses HtmlUnit, XPATH, and regular expressions to crawl a site
+and report email-like strings. After processing the command line, Mailx sets up the headless
+browser HtmlUnit client, and begins to crawl the site (either a URI or a page URL) by invoking the
+method crawl().
+
+crawl() checks if a page has already been crawled, i.e. is present in the urlsVisited set, and if it
+belongs to the website. If so, it traverses all of the pages HTML DOM nodes looking for text that
+might be an email. It does so by using HtmlUnit's XPATH API and then searching candidate text
+with pre-compiled regular expressions that match emails. Both HTML text nodes and comments are searched.
+
+After the search for emails is completed, traverse() looks for static links that match the current URI,
+and once collects them all, proceeds to executes the HtmlUnit click action on HTML nodes that have t
+the Angular.js ng-click attribute, via function visitDynamicLinks(). Once these visits are complete,
+static links are visited via visitStaticLinks(). These two last functions recursively call crawl()
+as appropriate.
+
+VisitDynamicLinks() simulates both the click action of a real browser and also simulates a back button
+press in case the page has already been visited, or if the page is outside the website (something
+that cannot be anticipated given the web server picks the routes). In order to let the JavaScript of
+each web page complete, after visiting a dynamic or static link, the program waits 100 mS by calling
+HtmlUnit's waitForBackgroundJavaScript() function.
+
+
+## Limitations
+
+Currently, the code is unable to switch HtmlUnit's page time to 100% XML pages, such as feeds,
+or php returning XML. When this happens, searching and inserting XML nodes, versus HTML Nodes,
+results in (caught) errors.
+
+In addition, efficiency can be increased by not checking files that might not contain emails if
+properly named, such as JPGs or PNGs. Right now a list and set of each page's static links is
+created, for debugging advantages, but these pages could be directly fed into the urlsReachable
+set, though any benefits in speed are not significant to the delays imposed by HtmlUnit waiting
+for background Javascript completion. 
+
+Currently, Mailx is not case sensitive, which might result in some omissions if some websites 
+include resources identically named but with different case.
+
+Many more route behavior and dynamic links, using attributes for events handled by RoR, ASP, etc.
+can be added. Currently these are not handled. Moreover, in some cases event waiting 100 mS after
+each page visited is insufficient for dynamic route invocations. This can result in some
+dynamic links not being visited at some times, but increasing this to 1 second results in
+slow execution even for moderately-sized sites.
+
+
+## Testing
+
+Mailx has been tested with java 1.8.0_66, on MacOS "Yosemite" v. 10.10.5 and with 
+java 1.8.0_72, and on MacOS "El Capitan," v. 10.11.2, using HtmlUnit v. 2.19.
