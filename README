@@ -20,7 +20,7 @@ following structure
 	|	 |        ---.gitignore (present here to have git store the classes path)
 	|
 	|--- lib
-	|    |--- [all jars required for HtmlUnit to run]
+	|    |--- [all jars required for HtmlUnit v.2.19 to run]
 	|
 	|--- src
 	|	 |---
@@ -113,4 +113,4 @@ slow execution even for moderately-sized sites.
 ## Testing
 
 Mailx has been tested with java 1.8.0_66, on MacOS "Yosemite" v. 10.10.5 and with 
-java 1.8.0_72, and on MacOS "El Capitan," v. 10.11.2.
+java 1.8.0_72, and on MacOS "El Capitan," v. 10.11.2, using HtmlUnit v. 2.19.
