@@ -212,6 +212,7 @@ public class Mailx {
     private static void searchNodes (HtmlPage page, String pageUrl, String xPath) {
 
 
+        // Ask from xPath text that has one (or more) embedded '@', store them in 'possibles'
         List<?> possibles;
         try { possibles = page.getByXPath(xPath); }
         catch (Exception e) {
@@ -221,13 +222,15 @@ public class Mailx {
         }
         printlnT("---- Possibilities found: " + possibles.size());
 
+        // Now need to search these text fragments for actual emails.
         Set<String> emails = new HashSet<String>();
         possibles.forEach((i) -> {
             String iStr = i.toString();
             printlnT(MARGIN + iStr);
             Matcher m = emailP.matcher(iStr); 
 
-            // Peel the first, second, third, or so email present in this text node
+            // Rather than simply extract the first match, check if more than one
+            // email is present in this block of text, say in a list or a line w/ 2 or more emails. 
             while (m.find() == true) { 
                // Some trace code, to check our regexes if we are debugging
                 int n = 0;
