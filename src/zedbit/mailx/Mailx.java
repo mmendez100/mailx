@@ -40,12 +40,15 @@ public class Mailx {
     static boolean trace; // Are we running in trace mode? Useful for debugging
 
     //Prepare to match on regexes for likely emails, very loose, to not miss domains such as .museum :)
-    static final Pattern emailP = Pattern.compile("[\\S^@]+@[\\S^@]+");
+    static final Pattern emailP = Pattern.compile("(.*)(\\b[\\S^@]+@[\\S^@]+\\b)(.*)");
 
     //We will follow two kinds of links, relative which we can build a regex for now, and absolute...
-    static final Pattern relHrefP = Pattern.compile("(^.*)(href=\")(/[^\"]+)(.*$)");
+    static final Pattern relHrefP = Pattern.compile("(^.*)(href=\"/)([^\"]+)(.*$)");
     static Pattern absHrefP; // compiled at method processArgs once we have extracted our uri
     static Pattern websiteP; // as above, used to check dynamic links/routes to be within this website
+
+    //Files we will not scan
+    static final Pattern skipP = Pattern.compile(".*(\\.(ico|jpg|jpeg|png|xml|php|php\\?rsd|css|pdf|doc|docx)|(/feed/)|(\\.css\\?.*))$", Pattern.CASE_INSENSITIVE);
 
     // Some constants for some pretty-printing 
     static final String ANSI_RED = "\u001B[31m";
@@ -84,6 +87,7 @@ public class Mailx {
     * for pages for which we have a static URL. 
     */
     private static void crawl(String pageUrl) {
+
 
         // First, check if we have been at this URL before, we back out
         if (urlsVisited.contains(pageUrl) == true) {
@@ -177,15 +181,27 @@ public class Mailx {
         searchNodes(page, pageUrl, "//text()[contains(.,\"@\")]"); // all DOM text nodes &
         searchNodes(page, pageUrl, "//comment()[contains(.,\"@\")]"); // all html comments
 
+        try {
 
-        // Now get all static links to crawl along these, accumulate then in urlsReachable
-        getStaticLinks (page, pageUrl);
+            // Now get all static links to crawl along these, accumulate then in urlsReachable
+            getStaticLinks (page, pageUrl);
 
-        // Here we click and crawl recursively on all dynamic links
-        visitDynamicLinks (page, pageUrl);
+            // Here we click and crawl recursively on all dynamic links
+            visitDynamicLinks (page, pageUrl);
     
-        // Now crawl recursively on all static links
-        visitStaticLinks (page, pageUrl);
+            // Now crawl recursively on all static links
+            visitStaticLinks (page, pageUrl);
+
+        } catch (StackOverflowError e) {
+            printlnV("StackOverflow to get to this link depth! Increase, if possible -Xss param at the command line!");
+            if (trace) { e.printStackTrace(); }
+            return;
+        } catch (Exception e) {
+            printlnV("Unexpected error while visiting and traversing links!");
+            if (trace) { e.printStackTrace(); }
+            return;
+
+        }
 
     }
 
@@ -196,7 +212,6 @@ public class Mailx {
     private static void searchNodes (HtmlPage page, String pageUrl, String xPath) {
 
 
-        Set<String> eMails = new HashSet<String>();
         List<?> possibles;
         try { possibles = page.getByXPath(xPath); }
         catch (Exception e) {
@@ -204,20 +219,36 @@ public class Mailx {
             if (trace) { e.printStackTrace(); }
             return;
         }
-
         printlnT("---- Possibilities found: " + possibles.size());
+
+        Set<String> emails = new HashSet<String>();
         possibles.forEach((i) -> {
             String iStr = i.toString();
-            printlnT("---- possible: " + iStr);
-            Matcher m = emailP.matcher(iStr);
-            while (m.find()) {
-                eMails.add(iStr);
-                System.out.println(MARGIN + iStr + ANSI_RED + "\n" +  MARGIN + "^^^ Likely an Email!"
-                    + ANSI_RESET + " [at " + pageUrl +"]");
+            printlnT(MARGIN + iStr);
+            Matcher m = emailP.matcher(iStr); 
+
+            // Peel the first, second, third, or so email present in this text node
+            while (m.find() == true) { 
+               // Some trace code, to check our regexes if we are debugging
+                int n = 0;
+                while (trace == true && n <= 3) { 
+                    printlnT(MARGIN + "regeX group(" + n + ")=" + m.group(n));
+                    n++;
+                }
+
+                // The actual saving of the email!
+                emails.add(m.group(2));
             }
+
+            // Get ready for the next possible match
             m.reset();
         });
-        printlnT("total unique local or relative emails found " + eMails.size());
+
+        emails.forEach((i) -> {
+                System.out.println(MARGIN + i + ANSI_RED + "\n" +  MARGIN + "^^^ Likely an Email!"
+                    + ANSI_RESET + " [at " + pageUrl +"]");
+        });
+        printlnT("total unique local or relative emails found " + emails.size());
 
     } // End searchNodes
 
@@ -236,10 +267,12 @@ public class Mailx {
             printlnT(MARGIN + iStr);
             Matcher m1 = absHrefP.matcher(iStr); // Match absolute links sharing local Uri
             Matcher m2 = relHrefP.matcher(iStr); // Match any relative links
-            if (m1.matches()) { localAnchors.add(m1.group(3)); m1.reset(); }
-            if (m2.matches()) { localAnchors.add(m2.group(3)); m2.reset(); }
+            if (m1.matches()) { localAnchors.add(m1.group(3)); }
+            if (m2.matches()) { localAnchors.add(uri + m2.group(3)); }
+            m1.reset(); m2.reset();
         });
-        printlnT("---- Anchors to Drill Into: -----");
+ 
+        printlnT("---- Possible Anchors to Drill Into: -----");
         localAnchors.forEach((i) -> { printlnT(MARGIN + i); });
         printlnT("---- Total unique local or relative anchors found: " + localAnchors.size() + "\n");
 
@@ -252,12 +285,18 @@ public class Mailx {
             printlnT(MARGIN + iStr);
             Matcher m1 = absHrefP.matcher(iStr);
             Matcher m2 = relHrefP.matcher(iStr);
-            if (m1.matches()) { localLinks.add(m1.group(3)); m1.reset(); }
-            if (m2.matches()) { localLinks.add(m2.group(3)); m2.reset(); }
+            if (m1.matches()) { localLinks.add(m1.group(3)); }
+            if (m2.matches()) { localLinks.add(uri + m2.group(3)); }
+            m1.reset(); m2.reset();
         });
-        printlnT("------ Links to Drill Into: -----");
+        printlnT("------ Possible Links to Drill Into: -----");
         localLinks.forEach((i) -> { printlnT(MARGIN + i); });
         printlnT("------ Total unique local or relative links found: " + localLinks.size());
+
+
+        // Now filter and remove static links to (presumed) binaries we do not search
+        filterByType(localAnchors);
+        filterByType(localLinks);
 
         // Now lets add the links we extracted into those we need to visit. Reachable is set to
         // compare string values and ignore case, so duplicate urls are eliminated
@@ -327,6 +366,28 @@ public class Mailx {
             return;
         }
     } // end Visit Static Links
+
+
+
+    /**
+    * filterByType removes links to static links such as pngs, jpgs, icos, and
+    * under types that we cannot currently handle, which are stored in the regex
+    * skipP 
+    */
+    private static void filterByType(Set<String> urls) {
+
+        Set<String> urlsOut = new HashSet<String>();
+        urls.forEach((i) -> {
+            Matcher m = skipP.matcher(i);
+            if (m.matches()) {
+                printlnT(MARGIN + "Skipping due to filetype: " + i);
+                urlsOut.add(i);
+            }
+            m.reset();
+        });
+        urls.removeAll(urlsOut);
+    }
+
 
     /**
     * setWebClient sets up the HtmlUnit web client (i.e. the simulated browser) with

@@ -36,7 +36,7 @@ following structure
 To build it, make the top mailx directory the current directory by cd'ing into it and
 execute the following at the command line:
 
-	javac -cp "classes:lib/*" -d classes src/zedbit/mailx/*.java
+        javac -cp "classes:lib/*" -d classes src/zedbit/mailx/*.java	
 
 Note: Mailx requires Java 8 or higher at the command line, (i.e. 1.8.x returned from the command 
 'java -version'). This usually requires installing the JDK, not only the JRE. Mailx will not
@@ -47,7 +47,15 @@ execute the following command line:
 
  	for silent mode:
 
-		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> 
+		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL>
+
+	Note: For complex sites, given HtmlUnit's needs, increase the default size of the 
+	JVM's stack. For example, when over 100 links are in a state of partial completion
+	at any one time, use 3 megabytes of stack space to hold all of the state of HtmlUnit
+	and Mailx:
+
+		java -Xss3m -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL>
+
 
 	As HtmlUnit waits for JavaScript completion for each website visited, the
 	slightly more verbose -v mode provides more input to the user as Mailx runs:
@@ -94,10 +102,9 @@ Currently, the code is unable to switch HtmlUnit's page time to 100% XML pages, 
 or php returning XML. When this happens, searching and inserting XML nodes, versus HTML Nodes,
 results in (caught) errors.
 
-In addition, efficiency can be increased by not checking files that might not contain emails if
-properly named, such as JPGs or PNGs. Right now a list and set of each page's static links is
-created, for debugging advantages, but these pages could be directly fed into the urlsReachable
-set, though any benefits in speed are not significant to the delays imposed by HtmlUnit waiting
+Right now a list and set of each page's static links is created, for debugging advantages, but
+these pages could be directly fed into the urlsReachable set, though any benefits in speed may
+not be significant compared to the delays imposed by HtmlUnit waiting
 for background Javascript completion. 
 
 Currently, Mailx is not case sensitive, which might result in some omissions if some websites 
@@ -109,8 +116,27 @@ each page visited is insufficient for dynamic route invocations. This can result
 dynamic links not being visited at some times, but increasing this to 1 second results in
 slow execution even for moderately-sized sites.
 
+A non-recursive approach might be needed to avoid stack errors. That this would work cannot be taken 
+for granted, because then we would have to burrow in and in and in, to get the right browser state 
+for dynamic links, versus taking advantage that we are right there now with recursion and we can 
+call them.
+
+Additional improvements would be to use a parser to detect emails. When a string of the form *@*, 
+the parser could then use '@' as a pivot and use the RFC5322 grammar to see if the mailbox is 
+correct, even if it includes spaces, comments. This is not just challenging in-so-far as 
+determining if a string is an email, but more so because the question is to find an email 
+*in* a string that might contain other text, even other emails! And some in unicode :)
+
+It looks that some emails embedded in <td>s that have themselves embedded anchors inside a span, with a mailto: in them, are sometimes printed with a trailing '>' corresponding to the closing span. 
+
+Of course, printing only unique emails, sorting them, etc. would be nice.
+
+
+
 
 ## Testing
 
 Mailx has been tested with java 1.8.0_66, on MacOS "Yosemite" v. 10.10.5 and with 
 java 1.8.0_72, and on MacOS "El Capitan," v. 10.11.2, using HtmlUnit v. 2.19.
+
+Different stack sizes of 1, 2, and 3 Mbytes have been used.
