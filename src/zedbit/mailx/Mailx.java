@@ -39,15 +39,17 @@ public class Mailx {
     static boolean trace; // Are we running in trace mode? Useful for debugging
     static int linksCrawled; // How many links did we crawl?
 
-    //Prepare to match on regexes for likely emails, very loose, to not miss domains such as .museum :)
-    static final Pattern emailP = Pattern.compile("(.*)(\\b[\\S^@]+@[\\S^@]+\\b)(.*)");
-
-    //We will follow two kinds of links, relative which we can build a regex for now, and absolute...
+    // We will follow two kinds of links, relative which we can build a regex for now, and absolute...
     static final Pattern relHrefP = Pattern.compile("(^.*)(href=\"/)([^\"]+)(.*$)");
     static Pattern absHrefP; // compiled at method processArgs once we have extracted our uri
     static Pattern websiteP; // as above, used to check dynamic links/routes to be within this website
 
-    //Files we will not scan
+    // Delimiters that we use to separate emails that might exist in the same line
+    // Some funky emails including quotes or the like might be split... but the overwhelming
+    // majority will be captured, including those with embedded dashes
+    static final String DELIMS = "[ ,?!_;:=<>\\(\\)\"]+";
+
+    // Files we will not scan
     static final Pattern skipP = Pattern.compile(".*(\\.(ico|jpg|jpeg|png|xml|php|php\\?rsd|css|pdf|doc|docx)|(/feed/)|(\\.css\\?.*))$", Pattern.CASE_INSENSITIVE);
 
     // How long of a wait for HtmlUnit to process background JavaScript when reaching a page? (mS)
@@ -241,31 +243,16 @@ public class Mailx {
         // Now need to search these text fragments for actual emails.
         Set<String> emails = new HashSet<String>();
         possibles.forEach((i) -> {
-            String iStr = i.toString();
-            printlnT(MARGIN + iStr);
-            Matcher m = emailP.matcher(iStr); 
-
-            // Rather than simply extract the first match, check if more than one
-            // email is present in this block of text, say in a list or a line w/ 2 or more emails. 
-            while (m.find() == true) { 
-               // Some trace code, to check our regexes if we are debugging
-                int n = 0;
-                while (trace == true && n <= 3) { 
-                    printlnT(MARGIN + "regeX group(" + n + ")=" + m.group(n));
-                    n++;
-                }
-                // The actual printing of the email!
-                emails.add(m.group(2));
+            String[] fragments = i.toString().split(DELIMS);
+            for ( String s : fragments ) {
+                // We take as possibles anything of the form a@b.c where a, b, c have 1 or more chars in lenght
+                // We reject a@b., a@local, or @life, some emails with embedded quotes might be lost :(
+                if (s.indexOf('@') > 0 && s.indexOf('.') > 2 && (s.length() - s.indexOf('.')) >= 1) {
+                    System.out.println(MARGIN + i + ANSI_RED + "\n" +  MARGIN + "^^^ Likely an Email!"
+                        + ANSI_RESET + " [at " + pageUrl +"]");
+                } 
             }
-            // Get ready for the next possible match
-            m.reset();
         });
-
-        emails.forEach((i) -> {
-                System.out.println(MARGIN + i + ANSI_RED + "\n" +  MARGIN + "^^^ Likely an Email!"
-                    + ANSI_RESET + " [at " + pageUrl +"]");
-        });
-        printlnT("total unique local or relative emails found " + emails.size());
 
     } // End searchNodes
 
