@@ -13,22 +13,22 @@ party websites are not crawled. Mailx uses the 'headless' browser HtmlUnit to ac
 To install and run, clone the contents of Mailx. The cloning will result in the
 following structure
 
-	mailx
-	|--- classes
-	|    |--- zedbit
-	|    |    --- mailx
-	|	 |        ---.gitignore (present here to have git store the classes path)
-	|
-	|--- lib
-	|    |--- [all jars required for HtmlUnit v.2.19 to run]
-	|
-	|--- src
-	|	 |---
-	|    |--- zedbit
-	|    |    --- mailx
-	|	 |        ---Mailx.java (the source for Mailx)
-	|
-	|--- README (this file) 
+    mailx
+    |--- classes
+    |    |--- zedbit
+    |    |    --- mailx
+    |    |        ---.gitignore (present here to have git store the classes path)
+    |
+    |--- lib
+    |    |--- [all jars required for HtmlUnit v.2.19 to run]
+    |
+    |--- src
+    |    |---
+    |    |--- zedbit
+    |    |    --- mailx
+    |    |        ---Mailx.java (the source for Mailx)
+    |
+    |--- README (this file) 
 
 
 ## Building and Executing Mailx
@@ -36,7 +36,7 @@ following structure
 To build it, make the top mailx directory the current directory by cd'ing into it and
 execute the following at the command line:
 
-        javac -cp "classes:lib/*" -d classes src/zedbit/mailx/*.java	
+        javac -cp "classes:lib/*" -d classes src/zedbit/mailx/*.java    
 
 Note: Mailx requires Java 8 or higher at the command line, (i.e. 1.8.x returned from the command 
 'java -version'). This usually requires installing the JDK, not only the JRE. Mailx will not
@@ -45,30 +45,28 @@ compile under Java 7.
 After building as specified above, to run, at the same top level directory mailx
 execute the following command line:
 
- 	for silent mode:
+    for silent mode:
 
-		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL>
+        java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL>
 
-	Note: For complex sites, given HtmlUnit's needs, increase the default size of the 
-	JVM's stack. For example, when over 100 links are in a state of partial completion
-	at any one time, use 3 megabytes of stack space to hold all of the state of HtmlUnit
-	and Mailx:
+    Note: For complex sites, given HtmlUnit's needs, increase the default size of the 
+    JVM's stack and heap. For example, when over 100 links are in a state of partial completion at any one time, use 3 megabytes of stack space to hold all of the state of HtmlUnit    and Mailx:
 
-		java -Xss3m -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL>
+        java -Xss3m -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL>
 
 
-	As HtmlUnit waits for JavaScript completion for each website visited, the
-	slightly more verbose -v mode provides more input to the user as Mailx runs:
+    As HtmlUnit waits for JavaScript completion for each website visited, the
+    slightly more verbose -v mode provides more input to the user as Mailx runs:
 
-		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> -v
+        java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> -v
 
-	for debug or trace mode, use -t
+    for debug or trace mode, use -t
 
-		java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> -t
+        java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL> -t
 
 The javadoc can be generated as follows, with -private used for meaningful output:
 
-	javadoc -private -d html -cp "classes:lib/*" -sourcepath src zedbit.mailx
+    javadoc -private -d html -cp "classes:lib/*" -sourcepath src zedbit.mailx
 
 
 ## Architecture and Comments
@@ -78,10 +76,11 @@ and report email-like strings. After processing the command line, Mailx sets up 
 browser HtmlUnit client, and begins to crawl the site (either a URI or a page URL) by invoking the
 method crawl().
 
-crawl() checks if a page has already been crawled, i.e. is present in the urlsVisited set, and if it
-belongs to the website. If so, it traverses all of the pages HTML DOM nodes looking for text that
-might be an email. It does so by using HtmlUnit's XPATH API and then searching candidate text
-with pre-compiled regular expressions that match emails. Both HTML text nodes and comments are searched.
+crawl() checks if a page has already been crawled, i.e. is present in the urlsVisited set encapsulated
+in the class UrlTracker, and if it belongs to the website. If so, it traverses all of the pages 
+HTML DOM nodes looking for text that might be an email. It does so by using HtmlUnit's XPATH API and then
+searching candidate text with pre-compiled regular expressions that match emails. Both HTML text nodes and
+comments are searched.
 
 After the search for emails is completed, traverse() looks for static links that match the current URI,
 and once collects them all, proceeds to executes the HtmlUnit click action on HTML nodes that have t
@@ -92,7 +91,7 @@ as appropriate.
 VisitDynamicLinks() simulates both the click action of a real browser and also simulates a back button
 press in case the page has already been visited, or if the page is outside the website (something
 that cannot be anticipated given the web server picks the routes). In order to let the JavaScript of
-each web page complete, after visiting a dynamic or static link, the program waits 100 mS by calling
+each web page complete, after visiting a dynamic or static link, the program waits 50 mS by calling
 HtmlUnit's waitForBackgroundJavaScript() function.
 
 

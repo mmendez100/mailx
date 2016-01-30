@@ -8,6 +8,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.logging.Logger;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
@@ -34,10 +35,9 @@ public class Mailx {
     static WebClient webClient; // The headless browser
     static String startPage; // Where the crawl begins, may be a URI or a page
     static String uri; // The URI 
-    static Set<String> urlsVisited = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER); // Tracks pages where we have crawled
-    static Set<String> urlsReachable = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER); // Tracks pages where crawling is OK
     static boolean verbose; // Are we running in verbose mode?
     static boolean trace; // Are we running in trace mode? Useful for debugging
+    static int linksCrawled; // How many links did we crawl?
 
     //Prepare to match on regexes for likely emails, very loose, to not miss domains such as .museum :)
     static final Pattern emailP = Pattern.compile("(.*)(\\b[\\S^@]+@[\\S^@]+\\b)(.*)");
@@ -49,6 +49,9 @@ public class Mailx {
 
     //Files we will not scan
     static final Pattern skipP = Pattern.compile(".*(\\.(ico|jpg|jpeg|png|xml|php|php\\?rsd|css|pdf|doc|docx)|(/feed/)|(\\.css\\?.*))$", Pattern.CASE_INSENSITIVE);
+
+    // How long of a wait for HtmlUnit to process background JavaScript when reaching a page? (mS)
+    static final int JS_WAIT = 50;
 
     // Some constants for some pretty-printing 
     static final String ANSI_RED = "\u001B[31m";
@@ -75,22 +78,27 @@ public class Mailx {
         // Now begin the drill down at startPage!
         crawl(startPage);
 
-        System.out.println ("Crawling completed!");
+        System.out.println ("Crawling completed!\nLinks Crawled: " + linksCrawled 
+            + ", " +UrlTracker.summary() );
 
     } // end main
 
 
    
     /**
-    * Crawl but limit ourselves to only links that we have not visited before
-    * <code>Crawl(String pageUrl)</code> is called 
-    * for pages for which we have a static URL. 
+    * Crawl, but limit ourselves to only links that we have not visited before
+    * <code>Crawl(String pageUrl)</code> is called for pages for which we have a static URL.
+    * <code>Crawl()</code> is really a function that sets the stage for <code>traverse()</code>
+    *  to do the work. 
     */
     private static void crawl(String pageUrl) {
 
+        // Increase crawl count, wait a bit for the page's JavaScript and HtmlUnit to catch up.
+        linksCrawled++;
+        webClient.waitForBackgroundJavaScript(JS_WAIT);
 
         // First, check if we have been at this URL before, we back out
-        if (urlsVisited.contains(pageUrl) == true) {
+        if (UrlTracker.hasBeenVisited(pageUrl) == true) {
             printlnT("We have already visited " + pageUrl + ". Skipping it");
             return;
         }
@@ -100,12 +108,9 @@ public class Mailx {
         HtmlPage page;  // This will be the page we will be working on, as represented by htmlUnit
         try { page = webClient.getPage(pageUrl); }
         catch (Exception e) {
-            // Mark we have been here before even if we got an error!
-            urlsVisited.add(pageUrl);
-            if (verbose || trace) {
-                System.err.println("Could not get page " + pageUrl);
-                if (trace) { e.printStackTrace(); }
-            }
+            UrlTracker.addErrored(pageUrl);
+            printlnT("HtmlUnit getPage exception " + e.toString());
+            if (trace) { e.printStackTrace(); }
             return;
         }
 
@@ -119,6 +124,9 @@ public class Mailx {
     * page is passed in parameter page. Notice that <code>Crawl(String pageUrl)</code> is 
     * instead called with a String parameter for pages that are expressed via a static URL.</p>
     *
+    * <code>Crawl()</code> is really a function that sets the stage for <code>traverse()</code>
+    *  to do the work. 
+    *
     * Because the URL of a page resulting from a script/route cannot be anticipated until
     * the browser is called, this page might not be inside this website. If this is the case
     * the method backs out of this page. To back out the code simulates pressing the "back"
@@ -127,17 +135,22 @@ public class Mailx {
     */
     private static void crawl(HtmlPage page) {
 
+        // Increase crawl count, wait a bit for the page's JavaScript and HtmlUnit to catch up.
+        linksCrawled++;
+        webClient.waitForBackgroundJavaScript(JS_WAIT);
+
         final String pageUrl = page.getUrl().toString();
         printlnV("Crawling Dynamic Link w/URL=" + pageUrl);
 
         // Now check if we have been at this URL before, OR if this dynamic
         // link is actually not in this website, if so we back out
-        if (urlsVisited.contains(pageUrl) == true) {
+        if (UrlTracker.hasBeenVisited(pageUrl) == true) {
             printlnV(MARGIN + pageUrl + " already crawled. Back buttoning it");
             try { webClient.getWebWindows().get(0).getHistory().back(); }
             catch (Exception e) {
+                UrlTracker.addErrored(pageUrl); // Could be out of the website
                 System.err.println("Back button after dynamic link invocation failed.");
-                if (verbose) { e.printStackTrace(); }
+                if (trace) { e.printStackTrace(); }
             }
             return;
         }
@@ -150,8 +163,9 @@ public class Mailx {
             printlnV(MARGIN + "Dynamic link/route sent us outside this website. Backing out and back buttoning!");
             try { webClient.getWebWindows().get(0).getHistory().back(); }
             catch (Exception e) {
+                UrlTracker.addErrored(pageUrl);
                 System.err.println("Back button after dynamic link invocation failed.");
-                if (verbose) { e.printStackTrace(); }
+                if (trace) { e.printStackTrace(); }
             }
             return;
         }
@@ -162,9 +176,9 @@ public class Mailx {
     } // End crawl
 
     /**
-    * <p>traverse checks if the current page has been visited before (by checking against 
-    * the contents of the <code>urlsVisited</code> set). If the page has not been visited,
-    * traverse looks for text and comment nodes that might
+    * <p>traverse checks if the current page has been visited before (by calling the 
+    * helper class  <code>UrlTracker.hasBeenVisited()</code> method). If the page has 
+    * not been visited, traverse looks for text and comment nodes that might
     * contain email strings by calling <code>searchNodes<code> on all HTML nodes containing 
     * text, comments included.</p>
     * 
@@ -175,28 +189,30 @@ public class Mailx {
     private static void traverse (HtmlPage page, String pageUrl) {
 
         // Mark we have been here!
-        urlsVisited.add(pageUrl);
+        UrlTracker.addVisited(pageUrl);
 
         // The page is open and loaded, now we can search...
         searchNodes(page, pageUrl, "//text()[contains(.,\"@\")]"); // all DOM text nodes &
         searchNodes(page, pageUrl, "//comment()[contains(.,\"@\")]"); // all html comments
+        searchNodes(page, pageUrl, "a[starts-with(@href, 'mailto')]/text()"); // all mailtos
+
 
         try {
-
-            // Now get all static links to crawl along these, accumulate then in urlsReachable
-            getStaticLinks (page, pageUrl);
 
             // Here we click and crawl recursively on all dynamic links
             visitDynamicLinks (page, pageUrl);
     
-            // Now crawl recursively on all static links
+            // Here we crawl recursively on all static links
             visitStaticLinks (page, pageUrl);
 
         } catch (StackOverflowError e) {
+            // Need to explore the root cause of the overflow a bit better... 
+            UrlTracker.addErrored(pageUrl);
             printlnV("StackOverflow to get to this link depth! Increase, if possible -Xss param at the command line!");
             if (trace) { e.printStackTrace(); }
             return;
         } catch (Exception e) {
+            UrlTracker.addErrored(pageUrl);
             printlnV("Unexpected error while visiting and traversing links!");
             if (trace) { e.printStackTrace(); }
             return;
@@ -238,11 +254,9 @@ public class Mailx {
                     printlnT(MARGIN + "regeX group(" + n + ")=" + m.group(n));
                     n++;
                 }
-
-                // The actual saving of the email!
+                // The actual printing of the email!
                 emails.add(m.group(2));
             }
-
             // Get ready for the next possible match
             m.reset();
         });
@@ -255,60 +269,86 @@ public class Mailx {
 
     } // End searchNodes
 
+    // An enum for visitStaticLinks() and getStaticLinks(), actions for ANCHOR and HREF 
+    // are nearly identical
+    private enum LinkType { ANCHOR, HREF }
+
     /**
-    * getStaticLinks visits the anchors and hyperlink expressions of the current page 
-    * and adds them to the set <code> urlsReachable </code>
+    * visitStaticLinks visits all static links included in the 
+    * set <code> links </code>
     */
-    private static void getStaticLinks (HtmlPage page, String pageUrl) {
+    private static void visitStaticLinks (HtmlPage page, String pageUrl) {
 
-        // First get all the links that might be stored in elements understood as anchors by the browser
-        Set<String> localAnchors = new HashSet<String>();
-        final List<HtmlAnchor> allAnchors = page.getAnchors();
-        printlnT("At " + pageUrl + "\nTotal anchors found " + allAnchors.size());
-        allAnchors.forEach((i) -> {
-            String iStr = i.toString();
-            printlnT(MARGIN + iStr);
-            Matcher m1 = absHrefP.matcher(iStr); // Match absolute links sharing local Uri
-            Matcher m2 = relHrefP.matcher(iStr); // Match any relative links
-            if (m1.matches()) { localAnchors.add(m1.group(3)); }
-            if (m2.matches()) { localAnchors.add(uri + m2.group(3)); }
-            m1.reset(); m2.reset();
+        // Get the anchors, then the HREFS, store them in links
+        Set<String> links = getStaticLinks (page, pageUrl, LinkType.ANCHOR);
+        links.addAll (getStaticLinks (page, pageUrl, LinkType.HREF));
+
+        // Now we recurse on the static content that we accumulated
+        links.forEach((i) -> {
+            printlnT("---- traversing static link: " + i);
+            if (UrlTracker.hasBeenVisited(i) == false) {
+                // We visit a URL we have not visited
+                try { crawl(i); }
+                catch (Exception e) {
+                    // If we error out, skip that link but try the others!
+                    UrlTracker.addErrored(i);
+                    printlnV("visitStaticLinks, exception caught when crawling " + i);
+                    if (trace) { e.printStackTrace(); }
+                }
+            }
         });
- 
-        printlnT("---- Possible Anchors to Drill Into: -----");
-        localAnchors.forEach((i) -> { printlnT(MARGIN + i); });
-        printlnT("---- Total unique local or relative anchors found: " + localAnchors.size() + "\n");
+    } // end Visit Static Links
 
-        //get list of all hrefs that are understood as a link by the browser
-        Set<String> localLinks = new HashSet<String>();
-        final List<?> allLinks = page.getByXPath("//link");
-        printlnT("At " + pageUrl + "\nLinks found " + allLinks.size());
-        allLinks.forEach((i) -> {
-            String iStr = i.toString();
+
+    /**
+    * getStaticLinks visits the anchors and hyperlink expressions of the current page
+    * let it be ANCHORs or HREFs based on the input of the parameter <code>type</type> 
+    * and returns them as a set.
+    */
+    private static Set<String> getStaticLinks (HtmlPage page, String pageUrl, LinkType type) {
+
+
+        // What we find as a list, might have many duplicates
+        List<String> linksAsList = null;
+
+        if (type == LinkType.ANCHOR) {
+            // Get all the links that might be stored in elements understood as anchors by the browser
+            linksAsList = page.getAnchors().stream()
+                .map(Object::toString)
+                .collect(Collectors.toList());
+            printlnT("At " + pageUrl + "\nTotal anchors found " + linksAsList.size());
+        }
+        else if (type == LinkType.HREF) {
+            // Get all links that are understood as HREFs by the browser
+            linksAsList = page.getByXPath("//link").stream()
+                .map(Object::toString)
+                .collect(Collectors.toList());
+            printlnT("At " + pageUrl + "\nLinks found " + linksAsList.size());
+        } else {
+            System.err.println ("Error! Unsuported type " + type);
+            return null;
+        }
+
+        // We will eliminate duplicates by returning a set, case insensitive
+        Set<String> linksAsSet = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER); 
+        linksAsList.forEach((i) -> {
+            String iStr = i.toString(); 
             printlnT(MARGIN + iStr);
             Matcher m1 = absHrefP.matcher(iStr);
             Matcher m2 = relHrefP.matcher(iStr);
-            if (m1.matches()) { localLinks.add(m1.group(3)); }
-            if (m2.matches()) { localLinks.add(uri + m2.group(3)); }
+            if (m1.matches()) { linksAsSet.add(m1.group(3)); }
+            if (m2.matches()) { linksAsSet.add(uri + m2.group(3)); }
             m1.reset(); m2.reset();
         });
-        printlnT("------ Possible Links to Drill Into: -----");
-        localLinks.forEach((i) -> { printlnT(MARGIN + i); });
-        printlnT("------ Total unique local or relative links found: " + localLinks.size());
+        printlnT("------ Possible Links (Anchors & HREFs) to Drill Into: -----");
+        linksAsList.forEach((i) -> { printlnT(MARGIN + i); });
+        printlnT("------ Count: " + linksAsList.size());
 
 
-        // Now filter and remove static links to (presumed) binaries we do not search
-        filterByType(localAnchors);
-        filterByType(localLinks);
-
-        // Now lets add the links we extracted into those we need to visit. Reachable is set to
-        // compare string values and ignore case, so duplicate urls are eliminated
-        // Case sensitiveness better be off in all Apaches, as DNS names are case insensitive :)
-        printlnT("------ Reachable URL count before adding links and anchors: " + urlsReachable.size());
-        urlsReachable.addAll(localAnchors);
-        urlsReachable.addAll(localLinks);
-        printlnT("------ Reachable URL count after adding these links: " + urlsReachable.size());
-
+        // Now filter and remove static links to (presumed) binaries we do not search,
+        // return the output
+        
+        return filterByType(linksAsSet);
     } // getStaticLinks
 
     /**
@@ -337,39 +377,11 @@ public class Mailx {
                 if (verbose) { e.printStackTrace(); }
                 return;
             }
-            // Wait a bit for the page's JavaScript and HtmlUnit to catch up.
-            webClient.waitForBackgroundJavaScript(100);
+            // Crawl the new page we have arrived at!
             crawl (newPage);
     
         });
     } // End visitDynamicLinks
-
-    /**
-    * visitStaticLinks visits all static links we have accumulated after examining
-    * the current page 
-    */
-    private static void visitStaticLinks (HtmlPage page, String pageUrl) {
-        // Now we recurse on the static content that we accumulated
-        try {
-            urlsReachable.forEach((i) -> {
-                printlnT("---- traversing static link: " + i);
-                if (urlsVisited.contains(i) == false) {
-                    // We visit a URL we have not visited
-                    printlnT("---- will crawl " + i);
-                    webClient.waitForBackgroundJavaScript(100);
-                    crawl(i);
-                }
-            });
-            // Now we can empty the set, as we have visited them all, or tried to
-            urlsReachable.clear();
-        } catch (Exception e) {
-            printlnV("Cannot iterate further! Async JavaScript HtmlUnit problems?!");
-            urlsReachable.clear();
-            if (trace) { e.printStackTrace(); }
-            return;
-        }
-    } // end Visit Static Links
-
 
 
     /**
@@ -377,18 +389,20 @@ public class Mailx {
     * under types that we cannot currently handle, which are stored in the regex
     * skipP 
     */
-    private static void filterByType(Set<String> urls) {
+    private static Set<String> filterByType(Set<String> urls) {
 
         Set<String> urlsOut = new HashSet<String>();
         urls.forEach((i) -> {
             Matcher m = skipP.matcher(i);
             if (m.matches()) {
                 printlnT(MARGIN + "Skipping due to filetype: " + i);
+            } else { 
+                // It did not match the filter, we keep it!
                 urlsOut.add(i);
-            }
+            } 
             m.reset();
         });
-        urls.removeAll(urlsOut);
+        return urlsOut;
     }
 
 
@@ -505,5 +519,57 @@ public class Mailx {
         // Print out only if trace mode is on
         if (trace == true) { System.out.println(str); }
     } // end printlnT
+
+
+    // Helper static nested classes //
+
+   /**
+    * The UrlTracker class encapsulates the set of urls that that have already been visited, 
+    * and the set of urls where we have errored out,
+    */
+    private static class UrlTracker {
+
+        // Tracks pages where we have crawled
+        static final Set<String> urlsVisited = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER); 
+
+        // Tracks pages where we errored out, we do not try to revisit them
+        static final Set<String> urlsErrored = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+
+
+       /**
+        * Call addVisited() when needing to indicate that String url has been visited. 
+        */
+        private static boolean addVisited (String url) {
+            // Add to the set of urls we have visited
+            return urlsVisited.add (url);
+        }
+
+       /**
+        * Call addErrored() when needing to indicate that visiting String url resulted in
+        * an error. This url should not be visited nor marked as reachable in the future
+        */
+        private static boolean addErrored (String url) {
+            printlnV("Adding to Error List. Could not successfully visit: " + url);
+            return urlsErrored.add(url);
+        }
+
+       /**
+        * Call hasBeenVisited() if wanting to figure out if this URL has been visited
+        * either successfully, or even if we got an error
+        */
+        private static boolean hasBeenVisited(String url) {
+            return (urlsVisited.contains(url) || urlsErrored.contains(url));
+        } 
+
+       /**
+        * Print the class contents in a nice fashion
+        */
+        private static String summary() {
+            return ("distinct urls visited: " + urlsVisited.size() + ", errorer out: " 
+                + urlsErrored.size());
+        } 
+
+
+    } //end class UrlTracker
 
 } // end class MailX
