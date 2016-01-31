@@ -248,7 +248,7 @@ public class Mailx {
                 // We take as possibles anything of the form a@b.c where a, b, c have 1 or more chars in lenght
                 // We reject a@b., a@local, or @life, some emails with embedded quotes might be lost :(
                 if (s.indexOf('@') > 0 && s.indexOf('.') > 2 && (s.length() - s.indexOf('.')) >= 1) {
-                    System.out.println(MARGIN + i + ANSI_RED + "\n" +  MARGIN + "^^^ Likely an Email!"
+                    System.out.println(MARGIN + s + ANSI_RED + "\n" +  MARGIN + "^^^ Likely an Email!"
                         + ANSI_RESET + " [at " + pageUrl +"]");
                 } 
             }
