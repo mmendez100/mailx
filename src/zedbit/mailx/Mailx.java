@@ -207,6 +207,9 @@ public class Mailx {
             // Here we crawl recursively on all static links
             visitStaticLinks (page, pageUrl);
 
+            // HtmlUnit needs this call to release resources...
+            webClient.close();
+
         } catch (StackOverflowError e) {
             // Need to explore the root cause of the overflow a bit better... 
             UrlTracker.addErrored(pageUrl);
@@ -366,7 +369,7 @@ public class Mailx {
             }
             // Crawl the new page we have arrived at!
             crawl (newPage);
-    
+
         });
     } // End visitDynamicLinks
 
