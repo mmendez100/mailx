@@ -49,11 +49,6 @@ execute the following command line:
 
         java -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL>
 
-    Note: For complex sites, given HtmlUnit's needs, increase the default size of the 
-    JVM's stack and heap. For example, when over 100 links are in a state of partial completion at any one time, use 3 megabytes of stack space to hold all of the state of HtmlUnit    and Mailx:
-
-        java -Xss3m -cp "classes:lib/*" zedbit.mailx.Mailx <an URI or URL>
-
 
     As HtmlUnit waits for JavaScript completion for each website visited, the
     slightly more verbose -v mode provides more input to the user as Mailx runs:
@@ -77,16 +72,16 @@ browser HtmlUnit client, and begins to crawl the site (either a URI or a page UR
 method crawl().
 
 crawl() checks if a page has already been crawled, i.e. is present in the urlsVisited set encapsulated
-in the class UrlTracker, and if it belongs to the website. If so, it traverses all of the pages 
-HTML DOM nodes looking for text that might be an email. It does so by using HtmlUnit's XPATH API and then
-searching candidate text with pre-compiled regular expressions that match emails. Both HTML text nodes and
-comments are searched.
+in the class UrlTracker, and if it belongs to the website. If so, it traverses all of the page's 
+HTML DOM nodes looking for text that might be an email. It does so by using HtmlUnit's XPATH API 
+and then searching candidate text with pre-compiled regular expressions that match emails. Both 
+HTML text nodes and comments are searched.
 
-After the search for emails is completed, traverse() looks for static links that match the current URI,
-and once collects them all, proceeds to executes the HtmlUnit click action on HTML nodes that have t
-the Angular.js ng-click attribute, via function visitDynamicLinks(). Once these visits are complete,
-static links are visited via visitStaticLinks(). These two last functions recursively call crawl()
-as appropriate.
+After the search for emails is completed, traverse() looks for static links that match the 
+current URI, and once collects them all, proceeds to executes the HtmlUnit click action on HTML nodes
+that have the Angular.js ng-click attribute, via function visitDynamicLinks(). Once these visits 
+are complete, static links are visited via visitStaticLinks(). These two last functions recursively
+call crawl() as appropriate.
 
 VisitDynamicLinks() simulates both the click action of a real browser and also simulates a back button
 press in case the page has already been visited, or if the page is outside the website (something
@@ -99,7 +94,8 @@ HtmlUnit's waitForBackgroundJavaScript() function.
 
 Currently, the code is unable to switch HtmlUnit's page time to 100% XML pages, such as feeds,
 or php returning XML. When this happens, searching and inserting XML nodes, versus HTML Nodes,
-results in (caught) errors.
+results in (caught) errors. Additionally, resources returned as text, not html, are not currently
+being searched.
 
 Right now a list and set of each page's static links is created, for debugging advantages, but
 these pages could be directly fed into the urlsReachable set, though any benefits in speed may
@@ -125,8 +121,6 @@ the parser could then use '@' as a pivot and use the RFC5322 grammar to see if t
 correct, even if it includes spaces, comments. This is not just challenging in-so-far as 
 determining if a string is an email, but more so because the question is to find an email 
 *in* a string that might contain other text, even other emails! And some in unicode :)
-
-It looks that some emails embedded in <td>s that have themselves embedded anchors inside a span, with a mailto: in them, are sometimes printed with a trailing '>' corresponding to the closing span. 
 
 Of course, printing only unique emails, sorting them, etc. would be nice.
 
